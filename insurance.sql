@@ -115,23 +115,36 @@ where c.reg_no=p.reg_no;
 select * from CarsInAccident;
 
 --A trigger that prevents a driver from participating in more than 2 accidents in a given year.
+DROP TRIGGER IF EXISTS PreventParticipation;
+
 DELIMITER //
 
 CREATE TRIGGER PreventParticipation
 BEFORE INSERT ON participated
 FOR EACH ROW
 BEGIN
-    IF (
-        SELECT COUNT(*)
-        FROM participated
-        WHERE driver_id = NEW.driver_id
-        AND year = NEW.year
-    ) >= 2
-    THEN
+    DECLARE new_year INT;
+    DECLARE accident_count INT;
+
+    SELECT YEAR(accident_date)
+    INTO new_year
+    FROM accident
+    WHERE report_no = NEW.report_no;
+
+    SELECT COUNT(DISTINCT p.report_no)
+    INTO accident_count
+    FROM participated p
+    JOIN accident a
+        ON p.report_no = a.report_no
+    WHERE p.driver_id = NEW.driver_id
+    AND YEAR(a.accident_date) = new_year;
+
+    IF accident_count >= 2 THEN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT =
         'Driver has already participated in 2 accidents in this year';
     END IF;
+
 END;//
 
 DELIMITER ;
